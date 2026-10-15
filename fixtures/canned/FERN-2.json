@@ -1,0 +1,53 @@
+{
+  "_note": "Stand-in for a model response, written for the offline demo and to test the pipeline without an API key. Not model output.",
+  "_about": "Written against docs/HARNESS.md. Across the four canned cards the tests cover the verdicts accepted, proves-nothing, fails-on-clean and rejected, plus an untestable criterion. Flaky and not-built-yet need a nondeterministic app or a card outside Done, so tests/taskgen/test_gate.py covers them. Keys that start with an underscore are notes for readers and are dropped before validation.",
+  "card": "FERN-2",
+  "tests": [
+    {
+      "criterion": "AC-1",
+      "name": "test_unverified_caller_gets_a_reply",
+      "intent": "Fails if Front Desk says nothing to an unverified caller who asks about an appointment.",
+      "code": "import pytest\n\n\n@pytest.mark.criterion(\"FERN-2/AC-1\")\ndef test_unverified_caller_gets_a_reply(call):\n    reply = call.say(\"When is my next appointment?\")\n\n    assert reply.text\n",
+      "_expected_verdict": "proves-nothing",
+      "_why": "Deliberately weak: it checks only that a reply exists, so it passes whatever Front Desk says."
+    },
+    {
+      "criterion": "AC-2",
+      "name": "test_verified_caller_hears_their_own_next_appointment",
+      "intent": "Fails if a verified caller is not confirmed or hears an appointment other than their own.",
+      "code": "import pytest\n\nfrom harness import MARIA_ALVAREZ\n\n\n@pytest.mark.criterion(\"FERN-2/AC-2\")\ndef test_verified_caller_hears_their_own_next_appointment(call):\n    call.say(\"When is my next appointment?\")\n    reply = call.verify_as(MARIA_ALVAREZ)\n\n    assert reply.text == (\n        \"Thanks, Maria, you're verified. Your next appointment is with Dr. Lindqvist \"\n        \"on Thursday, October 22nd at 2 PM.\"\n    )\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-2",
+      "name": "test_verified_caller_hears_the_appointment_time",
+      "intent": "Fails if a verified caller asking later is not told the time of their next appointment.",
+      "code": "import pytest\n\nfrom harness import PRIYA_RAMAN\n\n\n@pytest.mark.criterion(\"FERN-2/AC-2\")\ndef test_verified_caller_hears_the_appointment_time(call):\n    call.verify_as(PRIYA_RAMAN)\n    reply = call.say(\"When is my next appointment?\")\n\n    assert reply.text == (\n        \"Your next appointment is with Dr. Okafor on Tuesday, October 27th at 9:00 AM.\"\n    )\n",
+      "_expected_verdict": "fails-on-clean",
+      "_why": "Deliberate mistake: it expects '9:00 AM', but the guide says a time on the hour is spoken '9 AM'. The test is wrong, not the app."
+    },
+    {
+      "criterion": "AC-3",
+      "name": "test_date_of_birth_in_another_form_verifies",
+      "intent": "Fails if a date of birth said in words or as 3/3/80 does not verify the caller.",
+      "code": "import pytest\n\nfrom harness import MARIA_ALVAREZ\n\n\n@pytest.mark.criterion(\"FERN-2/AC-3\")\n@pytest.mark.parametrize(\n    \"said\",\n    [\"This is Maria Alvarez, born March 3rd 1980.\", \"This is Maria Alvarez, born 3/3/80.\"],\n)\ndef test_date_of_birth_in_another_form_verifies(call, said):\n    call.say(said)\n\n    assert call.record()[\"patientId\"] == MARIA_ALVAREZ.id\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-4",
+      "name": "test_three_failed_attempts_stop_and_offer_a_transfer",
+      "intent": "Fails if a third failed verification attempt asks again instead of stopping, offering a transfer and flagging the call.",
+      "code": "import pytest\n\nfrom harness import TRANSFER_OFFER, VERIFY_LOCKED\n\n\n@pytest.mark.criterion(\"FERN-2/AC-4\")\ndef test_three_failed_attempts_stop_and_offer_a_transfer(call):\n    call.say(\"My name is Maria Alvarez, born January 1st 1990.\")\n    call.say(\"My name is Maria Alvarez, born January 2nd 1990.\")\n    reply = call.say(\"My name is Maria Alvarez, born January 3rd 1990.\")\n\n    assert reply.text == f\"{VERIFY_LOCKED} {TRANSFER_OFFER}\"\n    assert \"verification_failed\" in call.record()[\"flags\"]\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-5",
+      "name": "test_verified_caller_hears_nothing_about_another_patient",
+      "intent": "Fails if a verified caller asking about another patient hears that patient's appointment.",
+      "code": "import pytest\n\nfrom harness import JAMES_WHITAKER, MARIA_ALVAREZ\n\n\n@pytest.mark.criterion(\"FERN-2/AC-5\")\ndef test_verified_caller_hears_nothing_about_another_patient(call):\n    call.verify_as(MARIA_ALVAREZ)\n    reply = call.say(\"When is James Whitaker's next appointment?\")\n\n    assert reply.text == (\n        \"I'm sorry, I can only share information about the patient I've verified on this call.\"\n    )\n    assert JAMES_WHITAKER.next_appointment.spoken not in reply.text\n",
+      "_expected_verdict": "proves-nothing",
+      "_why": "A correct test that no seeded bug breaks: the catalog has no mistake on this path, so the gate cannot show it can fail."
+    }
+  ],
+  "untestable": []
+}

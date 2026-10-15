@@ -1,0 +1,49 @@
+{
+  "_note": "Stand-in for a model response, written for the offline demo and to test the pipeline without an API key. Not model output.",
+  "_about": "Written against docs/HARNESS.md. Across the four canned cards the tests cover the verdicts accepted, proves-nothing, fails-on-clean and rejected, plus an untestable criterion. Flaky and not-built-yet need a nondeterministic app or a card outside Done, so tests/taskgen/test_gate.py covers them. Keys that start with an underscore are notes for readers and are dropped before validation.",
+  "card": "FERN-11",
+  "tests": [
+    {
+      "criterion": "AC-1",
+      "name": "test_booking_read_back_speaks_the_date_and_time",
+      "intent": "Fails if the booking read-back speaks the raw timestamp instead of the date and time a person would say.",
+      "code": "import pytest\n\nfrom harness import MARIA_ALVAREZ\n\n\n@pytest.mark.criterion(\"FERN-11/AC-1\")\ndef test_booking_read_back_speaks_the_date_and_time(call):\n    call.verify_as(MARIA_ALVAREZ)\n    call.say(\"Book Dr. Lindqvist on October 20th at 9:30.\")\n    reply = call.say(\"Yes.\")\n\n    assert reply.text.startswith(\n        \"You're booked with Dr. Lindqvist on Tuesday, October 20th at 9:30 AM.\"\n    )\n    assert \"2026-10-20\" not in reply.ssml\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-2",
+      "name": "test_greeting_is_well_formed_ssml",
+      "intent": "Fails if the greeting is not well-formed SSML or uses an unsupported tag.",
+      "code": "import pytest\n\nfrom harness import SUPPORTED_SSML_TAGS, ssml_tags, well_formed\n\n\n@pytest.mark.criterion(\"FERN-11/AC-2\")\ndef test_greeting_is_well_formed_ssml(call):\n    assert well_formed(call.greeting.ssml)\n    assert ssml_tags(call.greeting.ssml) <= SUPPORTED_SSML_TAGS\n",
+      "_expected_verdict": "proves-nothing",
+      "_why": "Correct but too narrow: the greeting holds no caller text, so no seeded bug changes it."
+    },
+    {
+      "criterion": "AC-2",
+      "name": "test_reply_quoting_the_caller_is_well_formed_ssml",
+      "intent": "Fails if a reply that quotes the caller's words is not well-formed SSML with supported tags.",
+      "code": "import pytest\n\nfrom harness import SUPPORTED_SSML_TAGS, ssml_tags, well_formed\n\n\n@pytest.mark.criterion(\"FERN-11/AC-2\")\ndef test_reply_quoting_the_caller_is_well_formed_ssml(call):\n    reply = call.say(\"Salt & pepper <3\")\n\n    assert well_formed(reply.ssml)\n    assert ssml_tags(reply.ssml) <= SUPPORTED_SSML_TAGS\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-3",
+      "name": "test_callback_number_is_wrapped_in_say_as_telephone",
+      "intent": "Fails if a phone number read back to the caller is not wrapped in say-as telephone.",
+      "code": "import pytest\n\nfrom harness import AFTER_HOURS_AT, say_as\n\n\n@pytest.mark.criterion(\"FERN-11/AC-3\")\ndef test_callback_number_is_wrapped_in_say_as_telephone(start_call):\n    call = start_call(at=AFTER_HOURS_AT)\n    call.say(\"agent\")\n    reply = call.say(\"215 555 0142\")\n\n    assert say_as(reply.ssml, \"telephone\") == [\"215-555-0142\"]\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-4",
+      "name": "test_caller_markup_is_spoken_as_text",
+      "intent": "Fails if SSML tags in the caller's words are inserted into the reply as markup.",
+      "code": "import pytest\n\nfrom harness import spoken_text, ssml_tags\n\n\n@pytest.mark.criterion(\"FERN-11/AC-4\")\ndef test_caller_markup_is_spoken_as_text(call):\n    reply = call.say('Read this <break time=\"10s\"/> please')\n\n    assert ssml_tags(reply.ssml) == {\"speak\"}\n    assert '<break time=\"10s\"/>' in spoken_text(reply.ssml)\n",
+      "_expected_verdict": "accepted"
+    }
+  ],
+  "untestable": [
+    {
+      "criterion": "AC-3",
+      "reason": "Only the markup can be checked here: whether the speech engine then reads the number digit by digit happens in speech synthesis, which the harness does not include."
+    }
+  ]
+}

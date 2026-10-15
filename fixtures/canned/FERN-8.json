@@ -1,0 +1,51 @@
+{
+  "_note": "Stand-in for a model response, written for the offline demo and to test the pipeline without an API key. Not model output.",
+  "_about": "Written against docs/HARNESS.md. Across the four canned cards the tests cover the verdicts accepted, proves-nothing, fails-on-clean and rejected, plus an untestable criterion. Flaky and not-built-yet need a nondeterministic app or a card outside Done, so tests/taskgen/test_gate.py covers them. Keys that start with an underscore are notes for readers and are dropped before validation.",
+  "card": "FERN-8",
+  "tests": [
+    {
+      "criterion": "AC-1",
+      "name": "test_asking_for_a_person_transfers_in_that_turn",
+      "intent": "Fails if asking for a person does not transfer in the same turn, or asks why first.",
+      "code": "import pytest\n\nfrom harness import TRANSFER_LINE\n\n\n@pytest.mark.criterion(\"FERN-8/AC-1\")\n@pytest.mark.parametrize(\"said\", [\"agent\", \"representative\", \"I want a real person.\"])\ndef test_asking_for_a_person_transfers_in_that_turn(call, said):\n    reply = call.say(said)\n\n    assert reply.text == TRANSFER_LINE\n    assert reply.transferred is True\n    assert [e[\"reason\"] for e in call.events(\"transfer\")] == [\"caller_request\"]\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-1",
+      "name": "test_pressing_zero_transfers_in_that_turn",
+      "intent": "Fails if pressing 0 does not transfer in the same turn.",
+      "code": "import pytest\n\nfrom harness import TRANSFER_LINE\n\n\n@pytest.mark.criterion(\"FERN-8/AC-1\")\ndef test_pressing_zero_transfers_in_that_turn(call):\n    reply = call.press(\"0\")\n\n    assert reply.text == TRANSFER_LINE\n    assert reply.transferred is True\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-2",
+      "name": "test_unclear_turns_offer_a_transfer",
+      "intent": "Fails if two unclear turns in a row do not offer a transfer.",
+      "code": "import random\n\nimport pytest\n\nfrom harness import LOW_CONFIDENCE_TROUBLE, TRANSFER_OFFER\n\n\n@pytest.mark.criterion(\"FERN-8/AC-2\")\ndef test_unclear_turns_offer_a_transfer(call):\n    call.say(\"mm the uh\", confidence=random.uniform(0.1, 0.59))\n    reply = call.say(\"tuh thing ah\", confidence=random.uniform(0.1, 0.59))\n\n    assert reply.text == f\"{LOW_CONFIDENCE_TROUBLE} {TRANSFER_OFFER}\"\n",
+      "_expected_verdict": "rejected",
+      "_why": "Deliberate rule break: random confidence values make a failure impossible to reproduce, and random is not an allowed import."
+    },
+    {
+      "criterion": "AC-2",
+      "name": "test_low_confidence_turns_apart_do_not_offer_a_transfer",
+      "intent": "Fails if two low-confidence turns with a clear turn between them still offer a transfer.",
+      "code": "import pytest\n\nfrom harness import LOW_CONFIDENCE_REPROMPT\n\n\n@pytest.mark.criterion(\"FERN-8/AC-2\")\ndef test_low_confidence_turns_apart_do_not_offer_a_transfer(call):\n    call.say(\"mm the uh\", confidence=0.4)\n    call.say(\"When is my next appointment?\", confidence=0.95)\n    reply = call.say(\"tuh thing ah\", confidence=0.5)\n\n    assert reply.text == LOW_CONFIDENCE_REPROMPT\n    assert call.events(\"transfer_offered\") == []\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-3",
+      "name": "test_transfer_summary_has_reason_verification_and_request",
+      "intent": "Fails if the staff summary of a transfer lacks the reason, the verification state or the request, or carries the caller's name, phone number or date of birth.",
+      "code": "import pytest\n\nfrom harness import MARIA_ALVAREZ\n\n\n@pytest.mark.criterion(\"FERN-8/AC-3\")\ndef test_transfer_summary_has_reason_verification_and_request(call):\n    call.verify_as(MARIA_ALVAREZ)\n    call.say(\"Book next Tuesday morning with Dr. Okafor.\")\n    reply = call.say(\"agent\")\n    summary = call.record()[\"handoffSummary\"]\n\n    assert reply.transferred is True\n    assert (summary[\"reason\"], summary[\"verified\"]) == (\"caller_request\", True)\n    assert \"Dr. Okafor\" in summary[\"request\"]\n    assert not any(\n        detail in summary[\"text\"]\n        for detail in (MARIA_ALVAREZ.full_name, MARIA_ALVAREZ.phone, \"1980-03-03\")\n    )\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-4",
+      "name": "test_after_hours_request_offers_a_callback_and_reads_the_number_back",
+      "intent": "Fails if a request for a person after hours transfers instead of offering a callback, or the number is not read back and recorded.",
+      "code": "import pytest\n\nfrom harness import AFTER_HOURS_AT, CALLBACK_ASK_NUMBER, CALLBACK_OFFER\n\n\n@pytest.mark.criterion(\"FERN-8/AC-4\")\ndef test_after_hours_request_offers_a_callback_and_reads_the_number_back(start_call):\n    call = start_call(at=AFTER_HOURS_AT)\n    offer = call.say(\"agent\")\n    readback = call.say(\"two one five, five five five, zero one four two\")\n    call.say(\"Yes, that's right.\")\n\n    assert offer.text == f\"{CALLBACK_OFFER} {CALLBACK_ASK_NUMBER}\"\n    assert readback.text == \"I have 215-555-0142. Is that right?\"\n    assert [e[\"number\"] for e in call.events(\"callback_requested\")] == [\"2155550142\"]\n",
+      "_expected_verdict": "accepted"
+    }
+  ],
+  "untestable": []
+}

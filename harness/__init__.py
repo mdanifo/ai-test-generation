@@ -1,0 +1,73 @@
+"""The pytest harness generated tests are written against.
+
+Import what a test needs from here (``from harness import MARIA_ALVAREZ, spoken_text``)
+and take the ``call`` or ``start_call`` fixture. docs/HARNESS.md documents all of it.
+"""
+
+from harness.client import Call, CallError, FrontDesk, Reply
+from harness.ssml import say_as, spoken_text, ssml_tags, well_formed
+from harness.world import (
+    AFTER_HOURS_AT,
+    CALLBACK_ASK_NUMBER,
+    CALLBACK_OFFER,
+    CALLBACK_REQUESTED,
+    CLINIC,
+    DEFAULT_AT,
+    DISCLOSURE,
+    EMERGENCY_SCRIPT,
+    JAMES_WHITAKER,
+    LOW_CONFIDENCE_REPROMPT,
+    LOW_CONFIDENCE_TROUBLE,
+    MARIA_ALVAREZ,
+    MODEL_TROUBLE,
+    NURSE_LINE_OFFER,
+    OPT_OUT_ACK,
+    PRIYA_RAMAN,
+    PROVIDERS,
+    SUPPORTED_SSML_TAGS,
+    THOMAS_BRENNAN,
+    TRANSFER_LINE,
+    TRANSFER_OFFER,
+    VERIFY_LOCKED,
+    WEEKEND_AT,
+    Appointment,
+    Patient,
+    patients,
+)
+
+__all__ = [
+    "AFTER_HOURS_AT",
+    "CALLBACK_ASK_NUMBER",
+    "CALLBACK_OFFER",
+    "CALLBACK_REQUESTED",
+    "CLINIC",
+    "DEFAULT_AT",
+    "DISCLOSURE",
+    "EMERGENCY_SCRIPT",
+    "JAMES_WHITAKER",
+    "LOW_CONFIDENCE_REPROMPT",
+    "LOW_CONFIDENCE_TROUBLE",
+    "MARIA_ALVAREZ",
+    "MODEL_TROUBLE",
+    "NURSE_LINE_OFFER",
+    "OPT_OUT_ACK",
+    "PRIYA_RAMAN",
+    "PROVIDERS",
+    "SUPPORTED_SSML_TAGS",
+    "THOMAS_BRENNAN",
+    "TRANSFER_LINE",
+    "TRANSFER_OFFER",
+    "VERIFY_LOCKED",
+    "WEEKEND_AT",
+    "Appointment",
+    "Call",
+    "CallError",
+    "FrontDesk",
+    "Patient",
+    "Reply",
+    "patients",
+    "say_as",
+    "spoken_text",
+    "ssml_tags",
+    "well_formed",
+]

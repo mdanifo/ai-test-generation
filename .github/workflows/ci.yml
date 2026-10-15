@@ -1,0 +1,105 @@
+# No job here has an Anthropic API key or calls the model. Generation in CI uses the
+# canned stand-ins in fixtures/canned/, which are labeled as not model output, and the
+# suites remove every ANTHROPIC_* variable and point the SDK at a closed local port
+# before any test runs.
+#
+# GitHub-hosted runners only: this repository is public, and a self-hosted runner on
+# a public repository would run code from fork pull requests on that machine.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A push to a pull request branch supersedes the run already going for it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    # 3.12 is the floor in pyproject.toml; 3.14 is the development version.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      # tests/generated holds the accepted generated tests; they run with the rest.
+      - run: pytest -n auto tests/frontdesk tests/taskgen tests/generated
+
+  bugs-are-real:
+    # Every seeded bug is caught by every reference-suite test that claims it, on an
+    # assertion, and the reference suite passes on the clean build.
+    name: bugs are real
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: python scripts/check_bugs_are_real.py
+
+  pipeline:
+    # The whole flow offline: canned stand-ins in, gate verdicts out. The counts are
+    # the ones README.md states; a change to the gate, the app or the canned files
+    # that moves one fails here.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: taskgen generate --mode canned --source file
+      - run: taskgen gate
+      - run: >-
+          taskgen report --quiet
+          --expect accepted=14,proves-nothing=5,fails-on-clean=1,rejected=2
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: proposed
+          path: proposed/
+          if-no-files-found: warn

@@ -1,0 +1,47 @@
+{
+  "_note": "Stand-in for a model response, written for the offline demo and to test the pipeline without an API key. Not model output.",
+  "_about": "Written against docs/HARNESS.md. Across the four canned cards the tests cover the verdicts accepted, proves-nothing, fails-on-clean and rejected, plus an untestable criterion. Flaky and not-built-yet need a nondeterministic app or a card outside Done, so tests/taskgen/test_gate.py covers them. Keys that start with an underscore are notes for readers and are dropped before validation.",
+  "card": "FERN-4",
+  "tests": [
+    {
+      "criterion": "AC-1",
+      "name": "test_emergency_phrases_get_the_script_and_a_flag",
+      "intent": "Fails if an emergency phrase gets anything but the approved script word for word, or the call is not flagged.",
+      "code": "import pytest\n\nfrom harness import EMERGENCY_SCRIPT\n\n\n@pytest.mark.criterion(\"FERN-4/AC-1\")\n@pytest.mark.parametrize(\n    \"said\",\n    [\n        \"I have chest pain.\",\n        \"My husband is having trouble breathing.\",\n        \"I think my mother is having a stroke.\",\n        \"This is an emergency.\",\n    ],\n)\ndef test_emergency_phrases_get_the_script_and_a_flag(call, said):\n    reply = call.say(said)\n\n    assert reply.text == EMERGENCY_SCRIPT\n    assert \"emergency\" in call.record()[\"flags\"]\n",
+      "_expected_verdict": "accepted"
+    },
+    {
+      "criterion": "AC-2",
+      "name": "test_emergency_script_plays_with_the_model_down",
+      "intent": "Fails if an emergency phrase gets no script when the language model is unavailable.",
+      "code": "import pytest\n\nfrom harness import EMERGENCY_SCRIPT\n\n\n@pytest.mark.criterion(\"FERN-4/AC-2\")\ndef test_emergency_script_plays_with_the_model_down(start_call):\n    for said in [\"I have chest pain.\", \"I can't breathe.\"]:\n        call = start_call(model_available=False)\n        assert call.say(said).text == EMERGENCY_SCRIPT\n",
+      "_expected_verdict": "accepted",
+      "_why": "Passes the gate with a static-check warning: a loop over literal values reads better as @pytest.mark.parametrize."
+    },
+    {
+      "criterion": "AC-2",
+      "name": "test_emergency_script_after_the_model_times_out",
+      "intent": "Fails if an emergency phrase gets no script once the model has timed out.",
+      "code": "import time\n\nimport pytest\n\nfrom harness import EMERGENCY_SCRIPT\n\n\n@pytest.mark.criterion(\"FERN-4/AC-2\")\ndef test_emergency_script_after_the_model_times_out(start_call):\n    call = start_call(model_available=False)\n    call.say(\"Hello?\")\n    time.sleep(3)\n\n    assert call.say(\"I have chest pain.\").text == EMERGENCY_SCRIPT\n",
+      "_expected_verdict": "rejected",
+      "_why": "Deliberate rule break: it imports time and sleeps, which the static checks reject before anything runs."
+    },
+    {
+      "criterion": "AC-3",
+      "name": "test_medication_dose_question_gets_the_nurse_line_offer",
+      "intent": "Fails if a question about changing a medication dose gets an answer instead of the nurse line offer.",
+      "code": "import pytest\n\nfrom harness import NURSE_LINE_OFFER\n\n\n@pytest.mark.criterion(\"FERN-4/AC-3\")\ndef test_medication_dose_question_gets_the_nurse_line_offer(call):\n    reply = call.say(\"Should I double my blood pressure medication dose?\")\n\n    assert reply.text == NURSE_LINE_OFFER\n    assert [e[\"topic\"] for e in call.events(\"nurse_line_offered\")] == [\"medication\"]\n",
+      "_expected_verdict": "proves-nothing",
+      "_why": "A correct test that no seeded bug breaks."
+    },
+    {
+      "criterion": "AC-4",
+      "name": "test_symptom_question_gets_no_diagnosis_and_the_nurse_line",
+      "intent": "Fails if a question about what a symptom means gets a diagnosis or a likely cause instead of the nurse line offer.",
+      "code": "import pytest\n\nfrom harness import NURSE_LINE_OFFER\n\n\n@pytest.mark.criterion(\"FERN-4/AC-4\")\ndef test_symptom_question_gets_no_diagnosis_and_the_nurse_line(call):\n    reply = call.say(\"What does a rash on my arm mean?\")\n\n    assert reply.text == NURSE_LINE_OFFER\n    assert [e[\"topic\"] for e in call.events(\"nurse_line_offered\")] == [\"symptom\"]\n",
+      "_expected_verdict": "proves-nothing",
+      "_why": "A correct test that no seeded bug breaks."
+    }
+  ],
+  "untestable": []
+}
