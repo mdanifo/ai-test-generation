@@ -6,13 +6,15 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from frontdesk import bugs
-from frontdesk.main import app
+from frontdesk.main import ApiError, CallStore, app, create_app
+from frontdesk.model import ScriptedModel
 from harness import DEFAULT_AT, MARIA_ALVAREZ, CallError
 
 REPO = Path(__file__).resolve().parents[2]
@@ -128,3 +130,40 @@ def test_the_openapi_document_never_mentions_the_seeded_bugs():
 def test_the_suite_runs_without_model_credentials():
     assert "ANTHROPIC_API_KEY" not in os.environ
     assert "ANTHROPIC_AUTH_TOKEN" not in os.environ
+
+
+def test_take_slot_rejects_an_unknown_provider(call):
+    with pytest.raises(CallError) as caught:
+        call.take_slot("Dr. Who", "2026-10-20T11:00:00-04:00")
+    assert (caught.value.status, caught.value.error) == (422, "unknown_provider")
+
+
+def test_an_unknown_route_gets_the_same_error_shape(api):
+    assert api.get("/nope").json() == {"error": "not_found", "detail": "Not Found"}
+    assert api.delete("/calls").json()["error"] == "method_not_allowed"
+
+
+def test_the_oldest_calls_are_dropped_once_the_store_is_full(monkeypatch):
+    monkeypatch.setattr("frontdesk.main.MAX_CALLS_KEPT", 2)
+    store = CallStore(ScriptedModel)
+    at = datetime.fromisoformat(DEFAULT_AT)
+    first, second, third = (store.start(at, True) for _ in range(3))
+
+    assert store.get(third.call_id) is third
+    assert store.get(second.call_id) is second
+    with pytest.raises(ApiError) as caught:
+        store.get(first.call_id)
+    assert caught.value.status == 404
+
+
+def test_an_unexpected_error_in_a_turn_is_a_500_with_an_error_body():
+    class Exploding(ScriptedModel):
+        def interpret(self, text, context):
+            raise RuntimeError("the model fell over")
+
+    with TestClient(create_app(Exploding), raise_server_exceptions=False) as client:
+        call_id = client.post("/calls", json={"at": DEFAULT_AT}).json()["callId"]
+        response = client.post(f"/calls/{call_id}/turns", json={"text": "hello"})
+
+    assert response.status_code == 500
+    assert response.json() == {"error": "internal_error", "detail": "RuntimeError"}

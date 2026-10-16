@@ -93,3 +93,14 @@ def test_a_file_outside_a_card_folder_is_reported(accepted):
         "FERN-99/test_x.py: FERN-99 is not a card on the board",
         "test_loose.py: accepted tests live in generated/<card>/<name>.py",
     ]
+
+
+def test_a_header_that_names_another_card_is_reported(accepted):
+    path = accepted / "FERN-8" / f"{ZERO}.py"
+    path.write_text(
+        path.read_text().replace("# Criterion: FERN-8/AC-1", "# Criterion: FERN-2/AC-1")
+    )
+
+    assert check_suite(accepted, CARDS) == [
+        f"FERN-8/{ZERO}.py: the header names no criterion of FERN-8"
+    ]

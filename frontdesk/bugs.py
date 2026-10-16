@@ -1,16 +1,15 @@
 """The seeded-bug catalog.
 
-Each entry is a realistic mistake that ships behind one marked branch, written
-as ``bugs.active("<name>")`` at the spot where a developer would make it. Set
-``SEEDED_BUG=<name>`` to turn one on; leave it unset (or empty) for the
-correct app.
+Each entry is a realistic mistake behind one marked branch, ``bugs.active("<name>")``,
+at the spot where a developer would make it. Set ``SEEDED_BUG=<name>`` to turn one on;
+unset or empty means the correct app.
 
-The gate runs proposed tests once per entry. A generated test counts only when
-it fails under at least one of them. This catalog is never shown to the model:
-it is not in the OpenAPI document, not in docs/HARNESS.md and not in the prompt.
+The gate runs proposed tests once per entry and counts a test only when it fails under
+at least one. The catalog stays out of the OpenAPI document, docs/HARNESS.md and the
+prompt.
 
-An unknown value is an error, never a silent "no bug": a typo in a bug name
-must not let a run report a catch that never happened.
+An unknown name is an error rather than a quiet "no bug", so a typo cannot pass a clean
+build off as a bug run.
 """
 
 from __future__ import annotations

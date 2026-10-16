@@ -140,3 +140,15 @@ def test_a_card_that_is_not_done_says_it_may_not_be_built():
     card = next(card for card in CARDS if card.ref == "FERN-5")
 
     assert "List: In Progress. The behavior may not be built yet" in card_message(card)
+
+
+def test_a_bug_description_in_the_openapi_document_stops_the_run():
+    description = next(iter(bugs.CATALOG.values()))
+
+    with pytest.raises(ContextLeakError, match="mentions the seeded bugs"):
+        system_text(openapi=openapi_document() + "\n" + description)
+
+
+def test_a_seeded_bug_named_in_the_instructions_stops_the_run():
+    with pytest.raises(ContextLeakError, match=r"'double-booking'"):
+        system_text(instructions=INSTRUCTIONS + "\nTry double-booking first.\n")

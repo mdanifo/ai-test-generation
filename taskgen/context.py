@@ -1,18 +1,13 @@
 """The cached system block: the instructions, then the context the model writes against.
 
-The context is two documents and nothing else:
+The context is the OpenAPI document of ``frontdesk.main.app`` (compact JSON, sorted
+keys, so the bytes match from run to run) and ``docs/HARNESS.md`` in full.
+``system_text()`` checks the whole block against the seeded-bug catalog before
+returning it, so an edit to the guide or the API that names a bug stops the run
+instead of reaching the model.
 
-* the OpenAPI document of ``frontdesk.main.app``, as compact JSON with sorted keys so
-  the bytes are the same on every run, and
-* ``docs/HARNESS.md``, the harness guide, in full.
-
-It never contains the app's source or the seeded-bug catalog. ``system_text()``
-checks that before returning, so a later edit to the guide or the API that
-mentions a seeded bug stops the run instead of reaching the model.
-
-Nothing volatile goes in here (no dates, ids or card details): the block is the
-cached prefix of every request, and one changed byte would make every card pay
-for a cache write again.
+Keep dates, ids and card details out of here. The block is the cached prefix of
+every request, and any change to it costs a cache write on the next card.
 """
 
 from __future__ import annotations

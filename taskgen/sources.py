@@ -1,6 +1,6 @@
 """Where cards come from: the task board's REST API, or a snapshot file.
 
-``TaskBoardSource`` reads a board with GET requests only:
+``TaskBoardSource`` reads a board with two GET requests:
 
 * ``GET {TASKS_URL}/api/v1/boards/{slug}`` for the lists and their cards
   (``list.role`` is todo, doing, done or hold), then
@@ -11,6 +11,9 @@ Auth is a Cloudflare Access service token in ``CF_ACCESS_CLIENT_ID`` and
 ``CF_ACCESS_CLIENT_SECRET``, sent as the ``CF-Access-Client-Id`` and
 ``CF-Access-Client-Secret`` headers. Their values are never logged, printed or
 put in an error message.
+
+Its one write is ``post_comment``, a POST to ``/api/v1/cards/{ref}/comments``
+that only ``taskgen comment --yes`` calls, so the service token needs that route too.
 
 ``FileSource`` reads a snapshot, the JSON that ``TaskBoardSource.snapshot()``
 writes (``taskgen snapshot``)::

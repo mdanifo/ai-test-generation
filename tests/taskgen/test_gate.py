@@ -13,6 +13,7 @@ import json
 import os
 import textwrap
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ from taskgen.gate import (
     RUNS_DIR,
     GateError,
     GateInput,
+    PytestRunner,
     RunResult,
     TestOutcome,
     Verdict,
@@ -826,3 +828,48 @@ def test_canned_stand_ins_get_the_verdicts_they_were_written_for(tmp_path):
     }
     assert sum(len(card.untestable) for card in run.cards) == 1
     assert all(t.caught for card in run.cards for t in card.accepted())
+
+
+@dataclass
+class ScriptRunner(PytestRunner):
+    """PytestRunner with ``python -c script`` in place of pytest, for runs that never answer."""
+
+    script: str = ""
+
+    def command(self, files: Sequence[str], label: str) -> list[str]:
+        return [self.python, "-c", self.script]
+
+
+def test_a_pytest_run_that_hangs_stops_the_gate_and_names_the_log(tmp_path):
+    runner = ScriptRunner(
+        rootdir=tmp_path,
+        runs_dir=tmp_path / "runs",
+        timeout=1.0,
+        script="import time; time.sleep(30)",
+    )
+
+    with pytest.raises(
+        GateError, match=r"run clean-1 did not finish within 1s; see .*clean-1\.log"
+    ):
+        runner(["test_x.py"], None, "clean-1")
+
+
+def test_a_pytest_run_that_exits_without_results_stops_the_gate_with_its_output(tmp_path):
+    runner = ScriptRunner(
+        rootdir=tmp_path,
+        runs_dir=tmp_path / "runs",
+        script="import sys; print('ERROR: usage: pytest [options]'); sys.exit(4)",
+    )
+
+    with pytest.raises(GateError, match="exited with code 4 and wrote no JUnit file") as caught:
+        runner(["test_x.py"], None, "clean-1")
+    assert "ERROR: usage: pytest [options]" in str(caught.value)
+
+
+def test_gate_results_refuses_a_result_for_a_card_it_was_not_given(tmp_path):
+    stray = GenerationResult(card="FERN-9", status="ok", source="canned")
+    runner = FakeRunner(lambda file, bug, label: passed())
+
+    with pytest.raises(KeyError, match="no card FERN-9 among the cards given to the gate"):
+        gate_results([FERN_8], [stray], proposed_dir=tmp_path, runner=runner)
+    assert runner.calls == []

@@ -3,11 +3,11 @@
 In the product the dialog manager calls Claude for two jobs: understanding a
 caller turn (intent and the spans that matter, such as a name or a date) and
 phrasing the reply. ``Model`` is that boundary. ``ScriptedModel`` fills it with
-rules and templates, so the app behaves the same on every run and its tests
-are deterministic. Testing the real model's behavior is what an eval set is
-for (FERN-14); this repository tests the system around the model.
+rules and templates, so the app behaves the same on every run. The real model's
+behavior is an eval-set question (FERN-14); the tests here cover the system
+around it.
 
-Approved scripts (``frontdesk.scripts``) never come from the model.
+Approved scripts (``frontdesk.scripts``) do not go through the model.
 """
 
 from __future__ import annotations

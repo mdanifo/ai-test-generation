@@ -48,8 +48,16 @@ def test_parse_time(said, clock):
     assert parse_time(said) == clock
 
 
-def test_phone_digits_said_as_words():
-    assert find_phone_digits("two one five, five five five, zero one four two") == "2155550142"
+@pytest.mark.parametrize(
+    ("said", "digits"),
+    [
+        ("two one five, five five five, zero one four two", "2155550142"),
+        ("two one five 555 oh one four two", "2155550142"),
+        ("call me at 215-555-0142", "2155550142"),
+    ],
+)
+def test_phone_digits_said_as_words_or_digits(said, digits):
+    assert find_phone_digits(said) == digits
 
 
 @pytest.mark.parametrize(
@@ -75,3 +83,48 @@ def test_spoken_slot_and_time():
 )
 def test_staffed_hours(moment, staffed):
     assert is_staffed(moment) is staffed
+
+
+@pytest.mark.parametrize(
+    ("span", "expected"),
+    [
+        ("3/3/26", date(2026, 3, 3)),
+        ("3/3/27", date(1927, 3, 3)),
+        ("1/1/00", date(2000, 1, 1)),
+        ("12/31/99", date(1999, 12, 31)),
+    ],
+)
+def test_two_digit_years_pivot_on_the_call_year(span, expected):
+    assert parse_dob(span, 2026) == expected
+
+
+@pytest.mark.parametrize(
+    "span", ["February 30th 1980", "13/13/1980", "2026-02-30", "Smarch 3rd 1980", "the 3rd"]
+)
+def test_impossible_dates_are_not_dates(span):
+    assert parse_dob(span, 2026) is None
+
+
+def test_a_date_already_past_this_year_means_next_year():
+    assert parse_day("October 1st", WEDNESDAY) == date(2027, 10, 1)
+    assert parse_day("October 1st 2026", WEDNESDAY) == date(2026, 10, 1)
+    assert parse_day("today", WEDNESDAY) == WEDNESDAY
+
+
+@pytest.mark.parametrize(
+    ("said", "clock"),
+    [
+        ("2 pm", time(14, 0)),
+        ("12 am", time(0, 0)),
+        ("12 pm", time(12, 0)),
+        ("at 9", time(9, 0)),
+        ("7:30 p.m.", time(19, 30)),
+    ],
+)
+def test_parse_time_reads_the_meridiem(said, clock):
+    assert parse_time(said) == clock
+
+
+@pytest.mark.parametrize("said", ["25:00", "9:75", "at 25"])
+def test_impossible_clock_values_are_not_times(said):
+    assert parse_time(said) is None

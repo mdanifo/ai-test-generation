@@ -886,3 +886,36 @@ def test_the_cost_line_shows_tokens_cache_reads_and_the_estimate():
         "3,000 output tokens · about $0.07 (estimated from list prices at the time of "
         "writing, which may change)"
     )
+
+
+def test_a_canned_file_that_fails_the_schema_is_a_failed_card_not_a_crash(tmp_path):
+    misnamed = {**GOOD, "tests": [{**GOOD["tests"][0], "name": "dob_check"}]}
+    write_canned(tmp_path, "FERN-2", {"_note": CANNED_NOTE, **misnamed})
+
+    result = CannedGenerator(tmp_path).generate(CARD)
+
+    assert (result.status, result.source, result.output) == ("invalid_output", "canned", None)
+    assert "tests.0.name" in (result.error or "")
+
+
+def test_a_canned_file_that_is_not_json_is_reported_by_path(tmp_path):
+    (tmp_path / "FERN-2.json").write_text("{half a file", encoding="utf-8")
+
+    with pytest.raises(GenerationError, match=r"FERN-2\.json is not valid JSON"):
+        CannedGenerator(tmp_path).generate(CARD)
+
+
+def test_a_recording_missing_a_field_is_unreadable_not_a_crash(tmp_path):
+    (tmp_path / "FERN-2.json").write_text(
+        json.dumps({"card": "FERN-2", "key": "x"}), encoding="utf-8"
+    )
+
+    with pytest.raises(
+        RecordingError, match=r"FERN-2\.json is unreadable \(KeyError: 'response'\)"
+    ):
+        replayer(tmp_path).generate(CARD)
+
+
+def test_cassettes_refuse_a_ref_that_is_not_a_card(tmp_path):
+    with pytest.raises(ValueError, match="not a card reference"):
+        Cassettes(tmp_path).path("../../etc/passwd")

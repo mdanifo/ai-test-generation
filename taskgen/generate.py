@@ -8,16 +8,16 @@
 * ``FakeGenerator`` returns responses given in code, for tests.
 
 Every generator returns a ``GenerationResult``. A refusal, an output cut off at
-``max_tokens``, a response that fails the schema, or an API error after the SDK's
-own retries is a failed result for that card, never a crash. Credentials, a wrong
-model and a malformed request fail every card alike, so they raise
-``GeneratorConfigError`` and stop the run.
+``max_tokens``, a response that fails the schema, or an API error left after the SDK's
+own retries is a failed result for that card. Bad credentials, a wrong model name or a
+malformed request would fail every card, so those raise ``GeneratorConfigError`` and
+stop the run.
 
 How the model is called (``ClaudeGenerator.request``):
 
 * model ``claude-opus-5-5`` unless ``TASKGEN_MODEL`` names another;
 * ``output_config.effort`` set to ``high`` explicitly (this model defaults to
-  medium); no ``thinking`` key, so thinking is adaptive, the model's default;
+  medium); no ``thinking`` key (adaptive thinking is the default);
 * structured output: ``output_config.format`` carries the JSON schema of
   ``taskgen.schema.GeneratedTests``, and the reply is validated with pydantic;
 * server-side refusal fallback: ``fallbacks="default"`` with the beta
@@ -25,7 +25,7 @@ How the model is called (``ClaudeGenerator.request``):
 * streaming, read with ``get_final_message()``, and ``max_tokens`` 32000;
 * prompt caching: one system block (instructions plus context) marked
   ``cache_control: {"type": "ephemeral"}``; the card is the user message after it.
-  Run cards one after another: parallel requests cannot read each other's cache.
+  Run cards one after another so each can read the cache the previous one wrote.
 """
 
 from __future__ import annotations
@@ -220,9 +220,9 @@ class ModelResponse:
     def from_message(
         cls, message: Any, *, request_id: str | None, requested_model: str
     ) -> ModelResponse:
-        """Read a (beta) Message from the SDK. Text blocks are read by type, never by position.
+        """Read a (beta) Message from the SDK, picking text blocks by type rather than position.
 
-        A refusal's partial text is dropped here: it is never a usable answer.
+        A refusal's partial text is dropped here.
         """
         text = (
             ""
@@ -843,9 +843,8 @@ def cost_line(results: Iterable[GenerationResult]) -> str | None:
     used = [result for result in results if result.used_model]
     if not used:
         return None
-    # A card whose call failed (an API error after the SDK's retries) carries no usage:
-    # no tokens were counted, so it adds nothing to the estimate rather than making it
-    # unknown. Only tokens from a model with no list price make the cost unknown.
+    # A card whose call failed carries no usage and adds nothing to the estimate. Only
+    # tokens from a model with no list price make the cost unknown.
     answered = [result for result in used if result.usage != Usage()]
     failed = len(used) - len(answered)
     usage = total_usage(answered)

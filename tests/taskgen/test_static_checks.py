@@ -151,6 +151,45 @@ def test_async_tests_are_rejected():
     assert "is async; the harness is synchronous, use def" in messages(code)
 
 
+def test_a_module_docstring_is_allowed_but_a_second_string_is_not():
+    with_docstring = '"""Asking for a person transfers."""\n' + GOOD
+    stray_string = GOOD.replace("\n\n\n@pytest", '\n\n"a stray string"\n\n\n@pytest', 1)
+
+    assert check_code(with_docstring, CARD).ok
+    assert "top-level" in rules(stray_string)
+
+
+def test_star_args_and_a_helper_inside_the_test_are_rejected():
+    starred = GOOD.replace("(call, said)", "(call, said, *extra)")
+    nested = GOOD.replace(
+        "    reply = call.say(said)\n",
+        "    def ask():\n        return call.say(said)\n    reply = ask()\n",
+    )
+
+    assert "takes *args or **kwargs; name each fixture it uses" in messages(starred)
+    assert "defines ask inside the test; write the steps in the test itself" in messages(nested)
+
+
+@pytest.mark.parametrize(
+    "decorator",
+    [
+        '@pytest.mark.parametrize(["said", "expected"], [("agent", True), ("hello", False)])\n',
+        '@pytest.mark.parametrize(argnames="said, expected", argvalues=[("agent", True)])\n',
+    ],
+    ids=["list-of-names", "argnames-keyword"],
+)
+def test_parametrize_names_are_read_from_a_list_or_the_argnames_keyword(decorator):
+    code = (
+        "import pytest\n\n\n"
+        '@pytest.mark.criterion("FERN-8/AC-1")\n'
+        f"{decorator}"
+        "def test_it(call, said, expected):\n"
+        "    assert call.say(said).transferred is expected\n"
+    )
+
+    assert check_code(code, CARD).ok
+
+
 def test_the_function_name_must_match_the_declared_name():
     assert rules(GOOD, name="test_something_else") == ["name"]
     assert "test_something_else" in messages(GOOD, name="test_something_else")
@@ -178,8 +217,9 @@ def test_only_criterion_and_parametrize_decorators_are_allowed():
         ),
         ('@pytest.mark.criterion("FERN-8 AC-1")\n', "is not written <card>/AC-<k>"),
         ("@pytest.mark.criterion(CRITERION)\n", "takes one literal string"),
+        ("@pytest.mark.criterion\n", "uses @pytest.mark.criterion without arguments"),
     ],
-    ids=["missing", "two", "other-card", "unknown-criterion", "malformed", "not-literal"],
+    ids=["missing", "two", "other-card", "unknown-criterion", "malformed", "not-literal", "bare"],
 )
 def test_the_criterion_marker_must_name_one_real_criterion_of_the_card(marker, expected):
     code = f"import pytest\n\n\n{marker}def test_it(call):\n    assert call.say('agent').text\n"
@@ -262,6 +302,7 @@ def test_harness_imports_use_the_documented_names(statement, expected):
         ("api.get('/test/build')", "test-hook", "names a test-only route"),
         ("api.post(f'/calls/{call.id}/test/take-slot', json={})", "test-hook", "call.take_slot"),
         ("call.__dict__", "dynamic", "reaches .__dict__"),
+        ("print(__name__)", "dynamic", "uses __name__"),
         ("api.get('http://127.0.0.1:9/health')", "network", "absolute URL"),
         ("pytest.skip('not today')", "skip", "calls pytest.skip()"),
         ("pytest.xfail('known')", "skip", "calls pytest.xfail()"),
@@ -437,8 +478,20 @@ def test_a_test_needs_an_assert_that_can_fail(lines, expected):
             ["for event in call.events('transfer'):", "    assert event['reason']"],
             "runs zero times",
         ),
+        (
+            ["for reply in [call.say('agent')]:", "    assert reply.text"],
+            "runs zero times",
+        ),
     ],
-    ids=["if", "while", "try", "conditional-expression", "match", "loop-over-app-data"],
+    ids=[
+        "if",
+        "while",
+        "try",
+        "conditional-expression",
+        "match",
+        "loop-over-app-data",
+        "loop-over-a-list-built-from-the-app",
+    ],
 )
 def test_control_flow_in_the_test_body_is_rejected(lines, expected):
     code = proposal(*lines)

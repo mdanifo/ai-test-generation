@@ -7,10 +7,9 @@
 * ``proposed/RUN.md`` (``run_report``): verdict counts per card and in total, which
   seeded bugs the accepted tests caught, and the run's cost line.
 * ``card_summary``: a few plain lines for a comment on the card. It names no seeded
-  bug, because a comment on the board is where the generator's input lives.
+  bug, since the board is where the generator's input comes from.
 
-The reports are for the person who reviews the tests. They are never sent to a
-generator.
+The reports are written for the person reviewing the tests.
 """
 
 from __future__ import annotations

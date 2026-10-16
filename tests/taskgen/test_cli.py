@@ -686,3 +686,43 @@ def test_snapshot_without_the_board_url_says_which_variable_to_set(capsys, tmp_p
 
     assert code == 1
     assert "TASKS_URL is not set" in err
+
+
+def test_generate_stops_before_any_request_when_the_guide_names_a_seeded_bug(
+    capsys, proposed, monkeypatch
+):
+    from taskgen import context
+
+    planted = context.harness_guide() + "\nTry double-booking.\n"
+    monkeypatch.setattr(context, "harness_guide", lambda path=None: planted)
+
+    code, _, err = run(
+        capsys, "generate", "--mode", "live", "--cards", "FERN-8", "--proposed", proposed
+    )
+
+    assert code == 1
+    assert "taskgen generate: the system block mentions the seeded bugs ('double-booking')" in err
+    assert not proposed.exists()
+
+
+def test_gate_reports_a_run_that_could_not_finish(capsys, proposed, monkeypatch):
+    def never_answers(files, bug, label):
+        raise gate.GateError(f"run {label}: the canary test did not pass")
+
+    monkeypatch.setattr(
+        gate, "gate_results", functools.partial(gate.gate_results, runner=never_answers)
+    )
+    run(capsys, "generate", "--mode", "canned", "--cards", "FERN-8", "--proposed", proposed)
+
+    code, _, err = run(capsys, "gate", "--proposed", proposed)
+
+    assert code == 1
+    assert "The gate could not run: run clean-1: the canary test did not pass" in err
+    assert not (proposed / "RUN.md").exists()
+
+
+def test_workers_must_be_one_or_more(proposed):
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["gate", "--workers", "0", "--proposed", str(proposed)])
+
+    assert exit_info.value.code == 2

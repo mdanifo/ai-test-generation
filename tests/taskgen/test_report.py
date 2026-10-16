@@ -372,3 +372,33 @@ def test_write_reports_writes_a_report_per_card_and_the_run_report(tmp_path):
     ]
     assert (tmp_path / "FERN-2" / "REPORT.md").read_text() == card_report(run.cards[0])
     assert (tmp_path / "RUN.md").read_text() == run_report(run)
+
+
+def test_a_test_whose_criterion_is_not_on_the_card_is_still_shown():
+    stray = outcome(6, "test_for_a_criterion_the_card_lacks", Verdict.REJECTED, criterion="AC-9")
+    report = card_report(fern_2(tests=(stray,)))
+    before, _, after = report.partition("## Tests listed under no criterion of this card")
+
+    assert "test_for_a_criterion_the_card_lacks" not in before
+    assert "**`test_for_a_criterion_the_card_lacks`** · rejected" in after
+
+
+def test_a_failure_message_with_backticks_is_fenced_so_it_still_reads_as_code():
+    caught = RunResult(
+        outcome="failed",
+        exception="AssertionError",
+        message="assert `x` == 'y'",
+        cases={"t": "failed"},
+    )
+    test = outcome(
+        2,
+        "test_ticks",
+        Verdict.ACCEPTED,
+        criterion="AC-3",
+        caught=["dob-format-strict"],
+        bugs_run={"dob-format-strict": caught},
+    )
+
+    report = card_report(fern_2(tests=(test,)))
+
+    assert "- Under `dob-format-strict`: `` assert `x` == 'y' ``" in report

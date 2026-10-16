@@ -11,19 +11,16 @@ For each card, ``gate_cards``:
 3. A card outside the Done list is not built yet: its tests are written for review,
    marked ``not-built-yet`` and not run.
 4. Runs the Done cards' tests against the clean build twice: once all together in one
-   pytest process, and once each test in a pytest process of its own. A test whose two
-   results differ is ``flaky``: it depends on another proposal or on the order tests
-   run in, so it would break once accepted on its own or run in parallel. One that does
-   not pass both times is ``fails-on-clean`` (the test or the app is wrong, and a person
-   decides which).
+   pytest process, and once each test in a process of its own. A test whose two results
+   differ is ``flaky``: it depends on another proposal or on run order. One that does not
+   pass both times is ``fails-on-clean``, and a person decides whether the test or the
+   app is wrong.
 5. Runs the same set of tests as the first clean run, all together, once per seeded bug
-   in ``frontdesk.bugs.CATALOG``, with ``SEEDED_BUG=<name>``. Only the tests that passed
-   both clean runs get a verdict from these runs. A test that fails an assertion
-   (``AssertionError``, or pytest's ``Failed`` from ``pytest.raises``) under at least one
-   bug is ``accepted``. Any other exception under a bug is a crash, reported but not
-   counted: it shows a step broke, not that the test checked anything. A test that no
-   bug makes fail on an assertion is ``proves-nothing``: it would not notice any of
-   those mistakes.
+   in ``frontdesk.bugs.CATALOG``, with ``SEEDED_BUG=<name>``. Only tests that passed both
+   clean runs get a verdict here. A test that fails an assertion (``AssertionError``, or
+   pytest's ``Failed`` from ``pytest.raises``) under at least one bug is ``accepted``. Any
+   other exception under a bug is a crash: reported, but a broken step is not a catch. A
+   test that no bug makes fail on an assertion is ``proves-nothing``.
 
 Each run is ``python -m pytest`` in a subprocess with the harness plugin (loaded by
 the repository's pyproject.toml), writing a JUnit XML file, the plugin's results file
@@ -31,11 +28,9 @@ and a log to ``proposed/runs/``. Each run starts its own Front Desk server, and 
 a canary test that only checks the app answered: if the canary does not pass, the run
 says nothing about the proposals and the gate stops with ``GateError``.
 
-The bug list stays on this side. The gate reads ``frontdesk.bugs`` to run the builds;
-nothing it produces is given to a generator. The model's context is the OpenAPI
-document, docs/HARNESS.md and the prompt, and ``taskgen.context`` refuses to send it
-if it names a seeded bug. The results, including which bugs each test caught, are for
-the person who reviews them, in ``proposed/<card>/gate.json`` and the reports.
+The gate reads ``frontdesk.bugs`` to run the builds, and nothing it produces goes back
+to a generator (``taskgen.context`` keeps the catalog out of the prompt). Which bugs each
+test caught is for the reviewer, in ``proposed/<card>/gate.json`` and the reports.
 """
 
 from __future__ import annotations
@@ -715,9 +710,8 @@ def gate_cards(
     runnable = [p.rel for p in gated]
     clean: dict[str, list[RunResult]] = {rel: [] for rel in runnable}
     if runnable:
-        # One run with every test together, and one run per test on its own. A test that
-        # passes only next to another proposal (reading state it left behind, or relying
-        # on running after it) gives two different results and is flaky.
+        # Every test together, then each on its own: a test that only passes next to
+        # another proposal comes out flaky.
         jobs = [(CLEAN_TOGETHER, runnable), *((_alone_label(p), [p.rel]) for p in gated)]
         with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
             runs = list(pool.map(lambda job: run(job[1], None, job[0]), jobs))
@@ -734,8 +728,7 @@ def gate_cards(
     ]
     under: dict[str, dict[str, RunResult]] = {rel: {} for rel in survivors}
     if survivors and bug_names:
-        # Each bug run holds exactly the tests of the first clean run, in the same order,
-        # so a test's result under a bug cannot change because a neighbour did not run.
+        # Bug runs take the same file list as the first clean run, so the neighbours match.
         with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
             by_bug = list(pool.map(lambda bug: run(runnable, bug, f"bug-{bug}"), bug_names))
         for bug, result in zip(bug_names, by_bug, strict=True):

@@ -1,13 +1,12 @@
 """Rules shared by the suites under tests/.
 
-* Every ANTHROPIC_* variable is removed from the environment as soon as this
-  file loads (keys, tokens, profiles, workload identity), and ANTHROPIC_BASE_URL
-  is then set to a closed local port. The SDK can also find credentials in an
-  on-disk profile (~/.config/anthropic); a client that did, in a test that forgot
-  to inject a fake one, would send its request to 127.0.0.1:9 and fail there
-  instead of reaching the API. So no test, and no subprocess a test starts, can
-  call the model. Every model response in the suites is fake or canned.
-  TASKGEN_MODEL goes too, so no result depends on the developer's shell.
+* Every ANTHROPIC_* variable is removed from the environment when this file loads
+  (keys, tokens, profiles, workload identity), and ANTHROPIC_BASE_URL is then set
+  to a closed local port. The SDK can also find credentials in an on-disk profile
+  (~/.config/anthropic); a client that did would send its request to 127.0.0.1:9
+  and fail there. No test, and no subprocess a test starts, can reach the API, and
+  every model response in the suites is fake or canned. TASKGEN_MODEL goes too,
+  so results do not depend on the developer's shell.
 * An unknown SEEDED_BUG stops the run before any test executes (the harness plugin checks).
 * ``@pytest.mark.catches("<bug>", ...)`` names the seeded bugs a test in the
   reference suite is meant to catch. An unknown name stops the run.
